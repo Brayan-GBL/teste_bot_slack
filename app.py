@@ -6,21 +6,20 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 app = Flask(__name__)
 
-# 1) Autenticação no Google Sheets
+# 1) Autenticação no Google Sheets (só Sheets API)
 scope = ['https://www.googleapis.com/auth/spreadsheets.readonly']
 creds_dict = json.loads(os.environ['GOOGLE_CREDS_JSON'])
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 gc = gspread.authorize(creds)
 
-# 2) Abrir a planilha e a aba
+# 2) Abrir a planilha por ID e a aba
 #    Defina no Render (ou .env local):
-#      SHEET_NAME = HUB_TRANSPORTES
-#      SHEET_TAB  = Página1
-sheet = gc.open(os.environ['SHEET_NAME']).worksheet(os.environ['SHEET_TAB'])
+#      SHEET_ID  = 1LwNJ_6uqm_carrlvSQBqZS-pwD2ndUQW-5b4vCy0FX4
+#      SHEET_TAB = Página1
+sheet = gc.open_by_key(os.environ['SHEET_ID']).worksheet(os.environ['SHEET_TAB'])
 
 @app.route('/consulta', methods=['POST'])
 def consulta_sac():
-    # 3) Pegar o texto enviado pelo Slash Command
     sac = request.form.get('text', '').strip()
     if not sac:
         return jsonify({
@@ -28,7 +27,6 @@ def consulta_sac():
             "text": "❌ Uso correto: `/consulta <código SAC>`"
         }), 200
 
-    # 4) Buscar todos os registros e encontrar a linha com "Último SAC" == sac
     registros = sheet.get_all_records()
     linha = next((r for r in registros if str(r.get('Último SAC','')).strip() == sac), None)
 
@@ -38,7 +36,6 @@ def consulta_sac():
             "text": f"⚠️ SAC *{sac}* não encontrado."
         }), 200
 
-    # 5) Montar a mensagem usando os cabeçalhos exatos da planilha
     msg = (
         f"📦 *SAC:* {linha['Último SAC']}\n"
         f"📅 *Data Sol Coleta:* {linha['Data Sol Coleta']}\n"
@@ -55,5 +52,4 @@ def consulta_sac():
     }), 200
 
 if __name__ == '__main__':
-    # Para desenvolvimento local
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
