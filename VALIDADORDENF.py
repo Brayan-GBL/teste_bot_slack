@@ -1,44 +1,39 @@
 import streamlit as st
 import pandas as pd
-import io
+import csv
+from io import StringIO
 
-st.title("🔍 Leitor de CSV - Teste de Coluna Específica")
+st.set_page_config(page_title="📊 Leitor de CSV - Teste de Coluna Específica")
 
-coluna_desejada = "Mov Estoque"
+st.title("📊 Leitor de CSV - Teste de Coluna Específica")
 
-# Upload de um arquivo CSV
-uploaded_file = st.file_uploader(
-    "Selecione o arquivo CSV",
-    type=["csv"]
-)
+uploaded_file = st.file_uploader("Selecione o arquivo CSV", type="csv")
 
-if uploaded_file:
+if uploaded_file is not None:
     try:
-        # Tentativa com separador ponto e vírgula
-        try:
-            df = pd.read_csv(uploaded_file, sep=";", encoding="utf-8", engine="python")
-        except:
-            df = pd.read_csv(uploaded_file, sep=",", encoding="utf-8", engine="python")
+        # Detectar separador automaticamente
+        sample = uploaded_file.read(2048).decode("utf-8", errors="ignore")
+        uploaded_file.seek(0)  # Voltar ponteiro para o início
 
-        if coluna_desejada in df.columns:
-            df_filtrado = df[[coluna_desejada]]
-            
-            st.subheader(f"📋 Dados da coluna: {coluna_desejada}")
-            st.dataframe(df_filtrado)
+        # Detectar delimitador mais provável
+        sniffer = csv.Sniffer()
+        dialect = sniffer.sniff(sample)
+        sep_detectado = dialect.delimiter
 
-            # Botão de download
-            output = io.BytesIO()
-            df_filtrado.to_excel(output, index=False)
-            output.seek(0)
+        st.info(f"Separador detectado: `{sep_detectado}`")
 
-            st.download_button(
-                label="📥 Baixar coluna filtrada",
-                data=output,
-                file_name="coluna_filtrada.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+        # Tentar carregar com cabeçalho
+        df = pd.read_csv(uploaded_file, sep=sep_detectado, encoding="utf-8", header=0)
+
+        st.subheader("Colunas detectadas:")
+        st.write(df.columns.tolist())
+
+        coluna_alvo = "Nota Fiscal Ent/Saída"
+        if coluna_alvo in df.columns:
+            st.success(f"✅ Coluna '{coluna_alvo}' encontrada!")
+            st.dataframe(df[[coluna_alvo]])
         else:
-            st.error(f"A coluna '{coluna_desejada}' não foi encontrada no arquivo.")
+            st.error(f"❌ A coluna '{coluna_alvo}' não foi encontrada no arquivo.")
 
     except Exception as e:
         st.error(f"Erro ao processar o arquivo: {e}")
