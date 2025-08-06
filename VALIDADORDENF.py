@@ -73,7 +73,7 @@ if uploaded_file is not None:
             # Correção da coluna PEG, se existir
             if "PEG" in df_colunas.columns:
                 df_colunas["PEG"] = df_colunas["PEG"].astype(str).apply(
-                 lambda x: re.sub(r'^=?"?(\d+)"?$', r'\1', x.strip())
+                 lambda x: re.sub(r'^0+(\d+)$', r'\1', re.sub(r'^=?"?(\d+)"?$', r'\1', x.strip()))
                   )
 
             # Criar arquivo Excel em memória
