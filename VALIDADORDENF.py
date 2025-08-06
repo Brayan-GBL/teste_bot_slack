@@ -73,8 +73,21 @@ if uploaded_file is not None:
             # Correção da coluna PEG, se existir
             if "PEG" in df_colunas.columns:
                 df_colunas["PEG"] = df_colunas["PEG"].astype(str).apply(
-                 lambda x: re.sub(r'^0+(\d+)$', r'\1', re.sub(r'^=?"?(\d+)"?$', r'\1', x.strip()))
-                  )
+                    lambda x: re.sub(r'^0+(\d+)$', r'\1', re.sub(r'^=?"?(\d+)"?$', r'\1', x.strip()))
+                )
+
+            # Filtros adicionais
+            filtros_tm = [
+                "Devolução de venda",
+                "Outras Entradas - Dev Remessa Escola",
+                "Devolução de Bonificação"
+            ]
+
+            if "Descrição TM" in df_colunas.columns and "Mov Estoque" in df_colunas.columns:
+                df_colunas = df_colunas[
+                    (df_colunas["Descrição TM"].isin(filtros_tm)) &
+                    (df_colunas["Mov Estoque"].astype(str).str.upper() == "S")
+                ]
 
             # Criar arquivo Excel em memória
             excel_buffer = io.BytesIO()
@@ -83,7 +96,7 @@ if uploaded_file is not None:
 
             # Botão para baixar Excel
             st.download_button(
-                label="📥 Baixar colunas selecionadas (Excel)",
+                label="📥 Baixar colunas filtradas (Excel)",
                 data=excel_buffer,
                 file_name="colunas_filtradas.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
