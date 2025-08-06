@@ -81,7 +81,7 @@ if uploaded_file is not None:
                 "Devolução de venda",
                 "Outras Entradas - Dev Remessa Escola",
                 "Devolução de Bonificação"
-                "Devolução Remessa Antecipada"
+                "Outras Entradas - Devolução Remessa Antecipada"
             ]
 
             if "Descrição TM" in df_colunas.columns and "Mov Estoque" in df_colunas.columns:
