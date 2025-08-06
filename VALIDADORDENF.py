@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import io
 
 st.set_page_config(page_title="📊 Leitor de CSV - Teste de Coluna Específica")
 
@@ -9,21 +10,17 @@ uploaded_file = st.file_uploader("Selecione o arquivo CSV", type="csv")
 
 if uploaded_file is not None:
     try:
-        # Forçar separador ; e encoding
-        df = pd.read_csv(
-            uploaded_file,
-            sep=";",           # força uso do ponto e vírgula
-            encoding="utf-8-sig",  # evita problema com acentos
-            quotechar='"'      # garante que campos entre aspas sejam lidos corretamente
-        )
+        # Lê o arquivo inteiro e garante que o BOM seja removido
+        content = uploaded_file.read()
+        decoded_content = content.decode("utf-8-sig")  # remove BOM se existir
+        df = pd.read_csv(io.StringIO(decoded_content), sep=";")
 
         st.subheader("Colunas detectadas:")
         st.write(df.columns.tolist())
 
-        # Nome da coluna que queremos buscar
         coluna_alvo = "Nota Fiscal Ent/Saída"
 
-        # Verificação sem case sensitive nem espaços extras
+        # Normaliza para comparação sem case sensitive e sem espaços extras
         colunas_normalizadas = {col.strip().lower(): col for col in df.columns}
         if coluna_alvo.strip().lower() in colunas_normalizadas:
             coluna_real = colunas_normalizadas[coluna_alvo.strip().lower()]
