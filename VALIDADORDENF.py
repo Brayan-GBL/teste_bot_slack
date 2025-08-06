@@ -20,6 +20,11 @@ colunas_procuradas_originais = [
     "Nota Fiscal Ent/Saída",
     "Data de Emissão",
     "Valor Líquido dos Produtos"
+    "PEG"
+    "Qtde"
+    "Mov Estoque"
+    "Tipo de Transação"
+    "Descrição TM"
 ]
 colunas_procuradas_norm = [normalizar_texto(c) for c in colunas_procuradas_originais]
 
