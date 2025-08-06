@@ -85,8 +85,8 @@ if uploaded_file is not None:
 
             if "Descrição TM" in df_colunas.columns and "Mov Estoque" in df_colunas.columns:
                 df_colunas = df_colunas[
-                    (df_colunas["Descrição TM"].isin(filtros_tm)) &
-                    (df_colunas["Mov Estoque"].astype(str).str.upper() == "S")
+                    (df_colunas["Descrição TM"].isin(filtros_tm))
+                    
                 ]
 
             # Criar arquivo Excel em memória
