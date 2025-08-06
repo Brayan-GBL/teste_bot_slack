@@ -1,33 +1,35 @@
-import streamlit as st
 import pandas as pd
-import io
+import streamlit as st
 
-st.set_page_config(page_title="📊 Leitor de CSV - Teste de Coluna Específica")
+# Configuração inicial do Streamlit
+st.set_page_config(page_title="Leitor de CSV - Teste de Coluna Específica", layout="centered")
+st.title("🔍 Leitor de CSV - Teste de Coluna Específica")
 
-st.title("📊 Leitor de CSV - Teste de Coluna Específica")
+# Upload do arquivo
+uploaded_file = st.file_uploader("Selecione o arquivo CSV", type=["csv"], help="Arraste ou selecione o arquivo CSV (máx. 200MB)")
 
-uploaded_file = st.file_uploader("Selecione o arquivo CSV", type="csv")
+# Nome da coluna que queremos encontrar
+coluna_procurada = "Nota Fiscal Ent/Saída"
 
 if uploaded_file is not None:
     try:
-        # Lê o arquivo inteiro e garante que o BOM seja removido
-        content = uploaded_file.read()
-        decoded_content = content.decode("utf-8-sig")  # remove BOM se existir
-        df = pd.read_csv(io.StringIO(decoded_content), sep=";")
+        # Leitura do CSV com separador ; e remoção do BOM
+        df = pd.read_csv(uploaded_file, sep=";", encoding="utf-8-sig")
 
-        st.subheader("Colunas detectadas:")
-        st.write(df.columns.tolist())
+        # Mostra colunas detectadas de forma clara
+        st.subheader("📑 Colunas detectadas:")
+        colunas = list(df.columns)
+        st.write(colunas)
 
-        coluna_alvo = "Nota Fiscal Ent/Saída"
-
-        # Normaliza para comparação sem case sensitive e sem espaços extras
-        colunas_normalizadas = {col.strip().lower(): col for col in df.columns}
-        if coluna_alvo.strip().lower() in colunas_normalizadas:
-            coluna_real = colunas_normalizadas[coluna_alvo.strip().lower()]
-            st.success(f"✅ Coluna '{coluna_real}' encontrada!")
-            st.dataframe(df[[coluna_real]])
+        # Verifica se a coluna existe no DataFrame
+        if coluna_procurada in df.columns:
+            st.success(f"✅ Coluna '{coluna_procurada}' encontrada no arquivo.")
         else:
-            st.error(f"❌ A coluna '{coluna_alvo}' não foi encontrada no arquivo.")
+            st.error(f"❌ A coluna '{coluna_procurada}' não foi encontrada no arquivo.")
 
+    except pd.errors.ParserError:
+        st.error("⚠️ Erro ao ler o CSV. Verifique se o separador está correto e se o arquivo não está corrompido.")
     except Exception as e:
-        st.error(f"Erro ao processar o arquivo: {e}")
+        st.error(f"⚠️ Ocorreu um erro inesperado: {str(e)}")
+else:
+    st.info("📌 Envie um arquivo CSV para iniciar a análise.")
