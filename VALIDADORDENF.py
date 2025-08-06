@@ -13,11 +13,15 @@ def normalizar_texto(texto):
 
 # Configuração do Streamlit
 st.set_page_config(page_title="Leitor Inteligente de Colunas", layout="centered")
-st.title("🔍 Leitor Inteligente - Extração de Coluna")
+st.title("🔍 Leitor Inteligente - Extração de Colunas Múltiplas")
 
-# Nome da coluna que queremos encontrar
-coluna_procurada_original = "Nota Fiscal Ent/Saída"
-coluna_procurada_norm = normalizar_texto(coluna_procurada_original)
+# Lista de colunas que queremos encontrar
+colunas_procuradas_originais = [
+    "Nota Fiscal Ent/Saída",
+    "Data de Emissão",
+    "Valor Líquido dos Produtos"
+]
+colunas_procuradas_norm = [normalizar_texto(c) for c in colunas_procuradas_originais]
 
 uploaded_file = st.file_uploader("Selecione o arquivo", type=["csv", "tsv", "txt"])
 
@@ -40,31 +44,35 @@ if uploaded_file is not None:
         # Criar dicionário {normalizado: original}
         colunas_normalizadas = {normalizar_texto(c): c for c in colunas_originais}
 
-        coluna_encontrada = None
+        colunas_encontradas = []
+        colunas_nao_encontradas = []
 
-        # Busca exata primeiro
-        if coluna_procurada_norm in colunas_normalizadas:
-            coluna_encontrada = colunas_normalizadas[coluna_procurada_norm]
-            st.success(f"✅ Coluna '{coluna_procurada_original}' encontrada como '{coluna_encontrada}'")
-        else:
-            # Busca aproximada
-            coluna_mais_parecida = difflib.get_close_matches(coluna_procurada_norm, colunas_normalizadas.keys(), n=1, cutoff=0.6)
-            if coluna_mais_parecida:
-                coluna_encontrada = colunas_normalizadas[coluna_mais_parecida[0]]
-                st.warning(f"⚠️ Coluna '{coluna_procurada_original}' não foi encontrada exatamente, mas encontramos algo parecido: '{coluna_encontrada}'")
+        # Procurar todas as colunas desejadas
+        for col_norm, col_original in zip(colunas_procuradas_norm, colunas_procuradas_originais):
+            if col_norm in colunas_normalizadas:
+                colunas_encontradas.append(colunas_normalizadas[col_norm])
             else:
-                st.error(f"❌ Nenhuma coluna parecida com '{coluna_procurada_original}' foi encontrada.")
+                # Busca aproximada
+                coluna_mais_parecida = difflib.get_close_matches(col_norm, colunas_normalizadas.keys(), n=1, cutoff=0.6)
+                if coluna_mais_parecida:
+                    colunas_encontradas.append(colunas_normalizadas[coluna_mais_parecida[0]])
+                    st.warning(f"⚠️ Coluna '{col_original}' não foi encontrada exatamente, mas encontramos algo parecido: '{colunas_normalizadas[coluna_mais_parecida[0]]}'")
+                else:
+                    colunas_nao_encontradas.append(col_original)
 
-        # Se encontrou a coluna, permitir download
-        if coluna_encontrada:
-            df_coluna = df[[coluna_encontrada]]
-            csv_bytes = df_coluna.to_csv(index=False).encode("utf-8-sig")
+        if colunas_encontradas:
+            st.success(f"✅ Colunas encontradas: {colunas_encontradas}")
+            df_colunas = df[colunas_encontradas]
+            csv_bytes = df_colunas.to_csv(index=False).encode("utf-8-sig")
             st.download_button(
-                label=f"📥 Baixar coluna '{coluna_encontrada}'",
+                label=f"📥 Baixar colunas selecionadas",
                 data=csv_bytes,
-                file_name=f"{coluna_encontrada}.csv",
+                file_name=f"colunas_filtradas.csv",
                 mime="text/csv"
             )
+
+        if colunas_nao_encontradas:
+            st.error(f"❌ Colunas não encontradas: {colunas_nao_encontradas}")
 
     except Exception as e:
         st.error(f"⚠️ Erro: {str(e)}")
