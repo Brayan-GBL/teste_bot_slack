@@ -69,6 +69,13 @@ if uploaded_file is not None:
             st.success(f"✅ Colunas encontradas: {colunas_encontradas}")
             df_colunas = df[colunas_encontradas]
 
+            # Correção da coluna PEG, se existir
+            if "PEG" in df_colunas.columns:
+                df_colunas["PEG"] = df_colunas["PEG"].astype(str) \
+                                                    .str.replace('="', '', regex=False) \
+                                                    .str.replace('"', '', regex=False) \
+                                                    .str.strip()
+
             # Criar arquivo Excel em memória
             excel_buffer = io.BytesIO()
             df_colunas.to_excel(excel_buffer, index=False, engine="xlsxwriter")
