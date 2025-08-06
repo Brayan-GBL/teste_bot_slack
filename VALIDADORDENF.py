@@ -3,7 +3,7 @@ import streamlit as st
 import unicodedata
 import difflib
 
-# Função para normalizar texto (remove acentos, deixa minúsculo, tira espaços extras)
+# Função para normalizar texto
 def normalizar_texto(texto):
     if not isinstance(texto, str):
         return ""
@@ -11,11 +11,11 @@ def normalizar_texto(texto):
     return texto.strip().lower()
 
 # Configuração do Streamlit
-st.set_page_config(page_title="Leitor de CSV Inteligente", layout="centered")
-st.title("🔍 Leitor de CSV Inteligente - Busca e Download de Coluna")
+st.set_page_config(page_title="Leitor TSV Inteligente", layout="centered")
+st.title("🔍 Leitor de Arquivo Inteligente - Busca e Download de Coluna")
 
 # Upload do arquivo
-uploaded_file = st.file_uploader("Selecione o arquivo CSV", type=["csv"], help="Arraste ou selecione o arquivo CSV")
+uploaded_file = st.file_uploader("Selecione o arquivo TSV/CSV", type=["csv", "tsv"], help="Arraste ou selecione o arquivo")
 
 # Nome da coluna que queremos encontrar
 coluna_procurada_original = "Nota Fiscal Ent/Saída"
@@ -23,8 +23,8 @@ coluna_procurada_norm = normalizar_texto(coluna_procurada_original)
 
 if uploaded_file is not None:
     try:
-        # Leitura do CSV (força separador ; e remove BOM)
-        df = pd.read_csv(uploaded_file, sep=";", encoding="utf-8-sig")
+        # Leitura do TSV (tabulação como separador)
+        df = pd.read_csv(uploaded_file, sep="\t", encoding="utf-8-sig")
 
         # Mostrar colunas detectadas
         st.subheader("📑 Colunas detectadas no arquivo:")
@@ -61,8 +61,8 @@ if uploaded_file is not None:
             )
 
     except pd.errors.ParserError:
-        st.error("⚠️ Erro ao ler o CSV. Verifique se o separador está correto e se o arquivo não está corrompido.")
+        st.error("⚠️ Erro ao ler o arquivo. Verifique se o separador está correto e se o arquivo não está corrompido.")
     except Exception as e:
         st.error(f"⚠️ Ocorreu um erro inesperado: {str(e)}")
 else:
-    st.info("📌 Envie um arquivo CSV para iniciar a análise.")
+    st.info("📌 Envie um arquivo TSV/CSV para iniciar a análise.")
