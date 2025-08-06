@@ -4,7 +4,7 @@ import io
 
 st.title("🔍 Leitor de CSV - Teste de Coluna Específica")
 
-coluna_desejada = "Nota Fiscal Ent/Saída"
+coluna_desejada = "Mov Estoque"
 
 # Upload de um arquivo CSV
 uploaded_file = st.file_uploader(
