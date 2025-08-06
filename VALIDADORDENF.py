@@ -80,7 +80,7 @@ if uploaded_file is not None:
             filtros_tm = [
                 "Devolução de venda",
                 "Outras Entradas - Dev Remessa Escola",
-                "Devolução de Bonificação"
+                "Devolução de Bonificação",
                 "Outras Entradas - Devolução Remessa Antecipada"
             ]
 
