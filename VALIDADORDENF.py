@@ -63,12 +63,18 @@ if uploaded_file is not None:
         if colunas_encontradas:
             st.success(f"✅ Colunas encontradas: {colunas_encontradas}")
             df_colunas = df[colunas_encontradas]
-            csv_bytes = df_colunas.to_csv(index=False).encode("utf-8-sig")
+
+            # Criar arquivo Excel em memória
+            excel_buffer = io.BytesIO()
+            df_colunas.to_excel(excel_buffer, index=False, engine="xlsxwriter")
+            excel_buffer.seek(0)
+
+            # Botão para baixar Excel
             st.download_button(
-                label=f"📥 Baixar colunas selecionadas",
-                data=csv_bytes,
-                file_name=f"colunas_filtradas.csv",
-                mime="text/csv"
+                label="📥 Baixar colunas selecionadas (Excel)",
+                data=excel_buffer,
+                file_name="colunas_filtradas.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
         if colunas_nao_encontradas:
