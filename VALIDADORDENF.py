@@ -3,6 +3,7 @@ import streamlit as st
 import unicodedata
 import difflib
 import io
+import re
 
 # Função para normalizar texto
 def normalizar_texto(texto):
@@ -71,10 +72,9 @@ if uploaded_file is not None:
 
             # Correção da coluna PEG, se existir
             if "PEG" in df_colunas.columns:
-                df_colunas["PEG"] = df_colunas["PEG"].astype(str) \
-                                                    .str.replace('="', '', regex=False) \
-                                                    .str.replace('"', '', regex=False) \
-                                                    .str.strip()
+                df_colunas["PEG"] = df_colunas["PEG"].astype(str).apply(
+                 lambda x: re.sub(r'^=?"?(\d+)"?$', r'\1', x.strip())
+                  )
 
             # Criar arquivo Excel em memória
             excel_buffer = io.BytesIO()
