@@ -20,15 +20,22 @@ st.title("🔍 Extração de Colunas Múltiplas")
 colunas_procuradas_originais = [
     "Nota Fiscal Ent/Saída",
     "Data de Emissão",
-    "Valor Líquido dos Produtos",
-    "PEG",
-    "Qtde",
-    "Descrição Produto",
-    "Valor Unitário",
-    "Mov Estoque",
+    "Clien/Fornec",
     "Tipo de Transação",
     "Descrição TM",
-    "Nro Pedido"
+    "Tipo Operação",
+    "PEG",
+    "Descrição Produto",
+    "Qtde",
+    "Valor Unitário",
+    "Valor Total Produtos",
+    "Desconto",
+    "Valor Líquido dos Produtos",
+    "Cliente contribuinte ICMS?",
+    "Mov Estoque",
+    "Descrição do Segmento",
+    "Descr do Tipo de Prod",
+    "Coleção"
 ]
 colunas_procuradas_norm = [normalizar_texto(c) for c in colunas_procuradas_originais]
 
