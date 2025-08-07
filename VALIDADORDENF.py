@@ -14,7 +14,7 @@ def normalizar_texto(texto):
 
 # Configuração do Streamlit
 st.set_page_config(page_title="Leitor Inteligente de Colunas", layout="centered")
-st.title("🔍 Leitor Inteligente - Extração de Colunas Múltiplas")
+st.title("🔍 Extração de Colunas Múltiplas")
 
 # Lista de colunas que queremos encontrar
 colunas_procuradas_originais = [
