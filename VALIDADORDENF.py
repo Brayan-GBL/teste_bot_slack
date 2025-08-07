@@ -34,8 +34,6 @@ colunas_procuradas_originais = [
     "Cliente contribuinte ICMS?",
     "Mov Estoque",
     "Descrição do Segmento",
-    "Descr do Tipo de Prod",
-    "Coleção",
     "Observação"
 ]
 colunas_procuradas_norm = [normalizar_texto(c) for c in colunas_procuradas_originais]
