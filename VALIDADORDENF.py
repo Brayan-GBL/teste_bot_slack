@@ -27,7 +27,8 @@ colunas_procuradas_originais = [
     "Valor Unitário",
     "Mov Estoque",
     "Tipo de Transação",
-    "Descrição TM"
+    "Descrição TM",
+    "Nro Pedido"
 ]
 colunas_procuradas_norm = [normalizar_texto(c) for c in colunas_procuradas_originais]
 
