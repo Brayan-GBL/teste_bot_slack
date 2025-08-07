@@ -23,6 +23,8 @@ colunas_procuradas_originais = [
     "Valor Líquido dos Produtos",
     "PEG",
     "Qtde",
+    "Descrição Produto",
+    "Valor Unitário",
     "Mov Estoque",
     "Tipo de Transação",
     "Descrição TM"
