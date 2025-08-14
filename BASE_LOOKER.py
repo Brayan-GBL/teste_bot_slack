@@ -1,15 +1,12 @@
 import io
 import re
 import csv
-import zipfile
 import chardet
-import pandas as pd
 import streamlit as st
-from io import StringIO
 
-# =========================
-# Config & Constantes
-# =========================
+# -------------------------------
+# Config
+# -------------------------------
 FINAL_HEADER = ('Área/Processo envolvido,Responsável SAC,Código da Ocorrência,Assunto,Tipo,Status,'
                 'Proprietário do SAC Name,Hora de Criação,Hora da modificação,Encerrado em,'
                 'Solução de Ensino,Tipo de Venda,Código SGE,Escola Nome,CNPJ,Razão Social,'
@@ -24,17 +21,13 @@ FINAL_HEADER = ('Área/Processo envolvido,Responsável SAC,Código da Ocorrênci
                 'NF DEV.LOJA FATURAMENTO,NF DEV. SIMP.FAT,Número contato,'
                 'Horário disponível para coleta,Responsável pela entrega,Tem restrição de acesso?')
 
-# aceita "Logística"/"Logistica", ignora BOM/aspas/espaços no início, case-insensitive
 LOG_START_RX = re.compile(r'^\s*["`\']*\s*log[íi]stica', re.IGNORECASE)
+EXCEL_CELL_LIMIT = 32767  # limite do Excel por célula
 
-# Excel costuma ter limite ~32.767 chars por célula; usamos margem
-EXCEL_CELL_LIMIT = 32760
-
-# =========================
-# Helpers de leitura/parse
-# =========================
+# -------------------------------
+# Helpers
+# -------------------------------
 def detect_decode(data: bytes) -> str:
-    """Decodifica bytes tentando latin-1 e caindo para o encoding detectado."""
     try:
         return data.decode("latin-1")
     except UnicodeDecodeError:
@@ -45,7 +38,6 @@ def normalize_newlines(text: str) -> str:
     return text.replace("\r\n", "\n").replace("\r", "\n")
 
 def first_field(line: str) -> str:
-    """Retorna o trecho antes do primeiro ';' (onde fica o conteúdo real)."""
     i = line.find(";")
     part = line if i < 0 else line[:i]
     part = part.strip()
@@ -54,12 +46,18 @@ def first_field(line: str) -> str:
     return part
 
 def is_start(line: str) -> bool:
-    """Detecta início de registro (linha que começa com 'Logística...' ou 'Logistica...')."""
-    s = re.sub(r'^[\uFEFF\s"\'`]+', '', line or '')  # remove BOM/aspas/espaços
+    s = re.sub(r'^[\uFEFF\s"\'`]+', '', line or '')
     return bool(LOG_START_RX.match(s))
 
+def clean_header_by_name(header: str, filename: str) -> str:
+    if re.search(r"sql_SAC_LogDevolucao_CQT", filename, re.I):
+        header = header.replace("Análise Realizada - Logística.", "Análise Realizada - Logística")
+    if re.search(r"sql_SAC__LogDevolucao_SPE", filename, re.I):
+        header = header.replace("Responsável pela entrega .", "Responsável pela entrega")
+    return header
+
 def rebuild_records(lines):
-    """Concatena linhas até o próximo início; não ignora nada."""
+    """Concatena as linhas exatamente como vieram (sem inserir/remover caracteres)."""
     out, buf = [], ""
     for ln in lines:
         if is_start(ln):
@@ -75,179 +73,111 @@ def rebuild_records(lines):
         out.append(buf)
     return out
 
-def clean_header_by_name(header: str, filename: str) -> str:
-    """Ajustes específicos de cabeçalho conforme o arquivo."""
-    if re.search(r"sql_SAC_LogDevolucao_CQT", filename, re.I):
-        header = header.replace("Análise Realizada - Logística.", "Análise Realizada - Logística")
-    if re.search(r"sql_SAC__LogDevolucao_SPE", filename, re.I):
-        header = header.replace("Responsável pela entrega .", "Responsável pela entrega")
-    return header
-
-# Parser robusto de linha CSV (respeita aspas, vírgulas internas e aspas escapadas "")
-def parse_csv_line(line: str, delim: str = ",", quotechar: str = '"'):
-    if line is None:
-        return [""]
-    reader = csv.reader(StringIO(line), delimiter=delim, quotechar=quotechar, doublequote=True)
-    try:
-        row = next(reader, [])
-    except Exception:
-        row = [line]
-    return [c.strip() for c in row]
-
-def normalize_row_len(row, header_len):
-    """Garante mesmo nº de colunas do cabeçalho: preenche faltantes ou junta excedente na última coluna."""
-    if len(row) == header_len:
-        return row
-    if len(row) < header_len:
-        return row + [""] * (header_len - len(row))
-    head = row[:header_len-1]
-    tail_joined = ",".join(row[header_len-1:])
-    return head + [tail_joined]
-
-# =========================
-# Builders de saída
-# =========================
+# -------------------------------
+# Saídas
+# -------------------------------
 def build_onecol_csv(final_lines):
-    """CSV com 1 coluna (cada item vira uma linha)."""
+    # CSV de 1 coluna; cada string vira uma linha
     buff = io.StringIO()
     w = csv.writer(buff, delimiter=',', quotechar='"', lineterminator='\r\n')
     for line in final_lines:
         w.writerow([line])
     return buff.getvalue().encode("utf-8")
 
-def build_wide_xlsx(rebuilt, header):
-    """XLSX com colunas explodidas por vírgula, tolerante a linhas irregulares."""
-    header_cols = parse_csv_line(header, ",")
-    header_len = len(header_cols)
+def build_onecol_xlsx_or_none(final_lines):
+    """Gera XLSX 1 coluna idêntico. Se alguma célula exceder o limite do Excel, NÃO cria XLSX (retorna None)."""
+    try:
+        import openpyxl
+    except Exception as e:
+        st.error(f"openpyxl não disponível: {e}")
+        return None
 
-    rows_norm = []
-    bad_counts = {}
+    # verificação prévia de limite: não alteramos dados
+    if any(len(s) > EXCEL_CELL_LIMIT for s in final_lines):
+        return None  # deixa o usuário com o CSV canônico
 
-    for line in rebuilt:
-        cols = parse_csv_line(line, ",")
-        if len(cols) != header_len:
-            bad_counts[len(cols)] = bad_counts.get(len(cols), 0) + 1
-        rows_norm.append(normalize_row_len(cols, header_len))
-
-    if bad_counts:
-        st.info(f"Linhas ajustadas para caber no cabeçalho (contagem diferente): {bad_counts}")
-
-    df = pd.DataFrame(rows_norm, columns=header_cols)
-    bio = io.BytesIO()
-    with pd.ExcelWriter(bio, engine="openpyxl") as writer:
-        df.to_excel(writer, sheet_name="Dados", index=False)
-    return bio.getvalue()
-
-def build_onecol_xlsx(final_lines):
-    """XLSX 1 coluna; divide linhas acima do limite do Excel em partes __PART_n__."""
-    import openpyxl
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Dados"
-    step = EXCEL_CELL_LIMIT - 12  # margem para o sufixo
     for line in final_lines:
-        if len(line) <= EXCEL_CELL_LIMIT:
-            ws.append([line])
-        else:
-            idx, part = 0, 1
-            while idx < len(line):
-                chunk = line[idx: idx + step]
-                ws.append([f"{chunk}__PART_{part}__"])
-                idx += step
-                part += 1
+        ws.append([line])
+
     bio = io.BytesIO()
     wb.save(bio)
     return bio.getvalue()
 
-# =========================
+# -------------------------------
 # UI
-# =========================
-st.set_page_config(page_title="Limpeza CSV SAC", page_icon="🧹", layout="wide")
-st.title("🧹 Limpeza & Conversão dos CSVs do SAC")
+# -------------------------------
+st.set_page_config(page_title="Limpeza CSV SAC (1 coluna)", page_icon="🧹", layout="wide")
+st.title("🧹 Limpeza & Reconstrução (1 coluna, sem alterar conteúdo)")
 
 st.markdown("""
-Faça upload dos **CSVs crus** (CQT e SPE).  
-O app aplica a tratativa (reconstrução “Logística…”, limpeza de cabeçalho, ordem fixa) e gera:
-- **`*_final_onecol.csv`** (1 coluna — ideal p/ Power BI),
-- **`*_final_wide.xlsx`** (colunas explodidas via parser CSV real),
-- **`*_final_onecol.xlsx`** (1 coluna — divide linhas gigantes em partes seguras).
+**Como funciona:**  
+1) Faça upload dos CSVs **crus** (CQT/SPE).  
+2) O app **só reconstrói** as linhas (detectando início por “Logística/Logistica”) e corrige o **cabeçalho**.  
+3) Entrega **apenas arquivos de 1 coluna**:
+   - `*_final_onecol.csv` (canônico — use este em primeiro lugar),
+   - `*_final_onecol.xlsx` (idêntico; **só é gerado** se nenhuma linha ultrapassar o limite do Excel).
 """)
 
-uploads = st.file_uploader("Selecione os CSVs (um ou mais)", type=["csv"], accept_multiple_files=True)
+uploads = st.file_uploader("Envie um ou mais CSVs (crus)", type=["csv"], accept_multiple_files=True)
 run = st.button("🚀 Processar", type="primary", use_container_width=True)
 
 if run:
     if not uploads:
         st.error("Envie pelo menos 1 CSV.")
     else:
-        results = []
         for upl in uploads:
             name = upl.name
             data = upl.read()
-            st.write(f"**Processando**: `{name}`")
 
-            # 1) leitura & normalização
+            # 1) leitura
             text = detect_decode(data)
             lines = [ln.strip() for ln in normalize_newlines(text).split("\n") if ln.strip()]
 
             # 2) primeiro campo antes de ';'
-            ff = [first_field(ln) for ln in lines]
-            if not ff:
-                st.warning(f"`{name}` parece vazio após leitura.")
+            if not lines:
+                st.warning(f"`{name}` está vazio.")
                 continue
+            ff = [first_field(ln) for ln in lines]
 
             header = clean_header_by_name(ff[0], name)
             body = ff[1:]
 
-            # 3) força cabeçalho final
+            # 3) força o cabeçalho final que você definiu
             final_header = FINAL_HEADER
 
-            # 4) reconstrução
+            # 4) reconstrução 100% literal (sem inserir/remover caracteres)
             rebuilt = rebuild_records(body)
 
             if not rebuilt:
-                st.warning(f"`{name}` não gerou registros após reconstrução. Verifique o arquivo de origem.")
+                st.warning(f"`{name}` não gerou registros após reconstrução.")
                 continue
 
-            # 5) saídas
-            onecol_csv_bytes  = build_onecol_csv([final_header] + rebuilt)
-            wide_xlsx_bytes   = build_wide_xlsx(rebuilt, final_header)
-            onecol_xlsx_bytes = build_onecol_xlsx([final_header] + rebuilt)
+            final_lines = [final_header] + rebuilt
 
-            base = name.rsplit(".", 1)[0]
+            # CSV (sempre)
+            csv_bytes = build_onecol_csv(final_lines)
             st.download_button(
-                f"⬇️ {base}_final_onecol.csv",
-                onecol_csv_bytes, file_name=f"{base}_final_onecol.csv",
-                mime="text/csv", use_container_width=True
-            )
-            st.download_button(
-                f"⬇️ {base}_final_wide.xlsx",
-                wide_xlsx_bytes, file_name=f"{base}_final_wide.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
-            )
-            st.download_button(
-                f"⬇️ {base}_final_onecol.xlsx",
-                onecol_xlsx_bytes, file_name=f"{base}_final_onecol.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                f"⬇️ {name.replace('.csv','')}_final_onecol.csv",
+                csv_bytes,
+                file_name=f"{name.replace('.csv','')}_final_onecol.csv",
+                mime="text/csv",
                 use_container_width=True
             )
 
-            results.append((base, onecol_csv_bytes, wide_xlsx_bytes, onecol_xlsx_bytes))
-
-        # ZIP opcional
-        if results:
-            zip_buf = io.BytesIO()
-            with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
-                for base, onecol_csv, wide_xlsx, onecol_xlsx in results:
-                    zf.writestr(f"{base}_final_onecol.csv", onecol_csv)
-                    zf.writestr(f"{base}_final_wide.xlsx",  wide_xlsx)
-                    zf.writestr(f"{base}_final_onecol.xlsx", onecol_xlsx)
-            zip_buf.seek(0)
-            st.download_button(
-                "📦 Baixar tudo em ZIP",
-                zip_buf, file_name="saidas_tratadas.zip",
-                mime="application/zip", use_container_width=True
-            )
-
-st.caption("Dica: para arquivos gigantes (≈600MB), prefira rodar local/servidor próprio por limite de upload do Streamlit Cloud.")
+            # XLSX (só se não estourar o limite do Excel)
+            xlsx_bytes = build_onecol_xlsx_or_none(final_lines)
+            if xlsx_bytes is not None:
+                st.download_button(
+                    f"⬇️ {name.replace('.csv','')}_final_onecol.xlsx",
+                    xlsx_bytes,
+                    file_name=f"{name.replace('.csv','')}_final_onecol.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+            else:
+                st.info("⚠️ Algumas linhas excedem o limite de 32.767 caracteres do Excel por célula. "
+                        "Por isso o **XLSX** não foi gerado para este arquivo. "
+                        "Use o **CSV** (é idêntico e sem limite).")
